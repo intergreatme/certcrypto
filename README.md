@@ -40,7 +40,7 @@ if err != nil {
 To load a certificate from a PEM file:
 
 ```go
-certificate, err := selfsign.LoadCertificate("path/to/certificate.pem")
+certificate, err := selfsign.LoadPFXCertificate("path/to/certificate.pem")
 if err != nil {
     log.Fatalf("Failed to load certificate: %v", err)
 }
