@@ -6,30 +6,31 @@ import (
 	"encoding/pem"
 	"errors"
 	"os"
+
+	"software.sslmate.com/src/go-pkcs12"
 )
 
-// LoadCertificate loads a certificate from a PEM file.
-func LoadCertificate(path string) (*x509.Certificate, error) {
-	// Read the PEM file containing the certificate.
-	pemData, err := os.ReadFile(path)
+// LoadPFXCertificate loads a certificate from a PFX file.
+func LoadPFXCertificate(path, password string) (*x509.Certificate, error) {
+	// Read the PFX file containing the certificate.
+	pfxData, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err // Return an error if the file cannot be read.
 	}
 
-	// Decode the PEM data to extract the PEM block.
-	block, _ := pem.Decode(pemData)
-	if block == nil || block.Type != "CERTIFICATE" {
-		return nil, errors.New("failed to decode PEM block containing certificate") // Return an error if the PEM block is invalid or not a certificate.
+	// Decode the PFX data to extract the certificate.
+	privateKey, certificate, err := pkcs12.Decode(pfxData, password)
+	if err != nil {
+		return nil, err // Return an error if the PFX data cannot be decoded.
 	}
 
-	// Parse the certificate from the PEM block.
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil, err // Return an error if the certificate cannot be parsed.
+	// Assert the private key type and discard it if present.
+	if _, ok := privateKey.(*rsa.PrivateKey); !ok {
+		return nil, errors.New("unexpected private key type in PFX file")
 	}
 
 	// Return the parsed x509 certificate.
-	return cert, nil
+	return certificate, nil
 }
 
 // LoadPrivateKey loads an encrypted private key from a PEM file.

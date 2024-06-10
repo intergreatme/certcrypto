@@ -10,7 +10,6 @@ import (
 // decryptPrivateKey decrypts the encrypted private key using AES-GCM with the provided password.
 func decryptPrivateKey(encryptedKey []byte, password string) ([]byte, error) {
 	// Derive a key from the password using SHA-256.
-	// The derived key is 32 bytes long, suitable for AES-256 encryption.
 	hash := sha256.Sum256([]byte(password))
 
 	// Create a new AES cipher block from the derived key.
@@ -35,7 +34,6 @@ func decryptPrivateKey(encryptedKey []byte, password string) ([]byte, error) {
 	nonce, ciphertext := encryptedKey[:nonceSize], encryptedKey[nonceSize:]
 
 	// Decrypt the ciphertext using the nonce and the GCM cipher.
-	// The Open method decrypts the data and verifies its integrity.
 	decryptedKey, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return nil, err

@@ -10,11 +10,11 @@ import (
 )
 
 // DownloadAndCachePublicKey downloads the public key from the specified URI and caches it at the specified path.
-func DownloadAndCachePublicKey(uri, cachePath string) (*x509.Certificate, error) {
+func DownloadAndCachePublicKey(uri, cachePath string, password string) (*x509.Certificate, error) {
 	// Check if the public key is already cached.
 	if _, err := os.Stat(cachePath); err == nil {
 		// Load the cached public key.
-		return LoadCertificate(cachePath)
+		return LoadPFXCertificate(cachePath, password)
 	}
 
 	// Download the public key from the URI.
@@ -42,5 +42,5 @@ func DownloadAndCachePublicKey(uri, cachePath string) (*x509.Certificate, error)
 	}
 
 	// Load the cached public key.
-	return LoadCertificate(cachePath)
+	return LoadPFXCertificate(cachePath, password)
 }

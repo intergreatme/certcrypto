@@ -15,10 +15,17 @@
 //	    log.Fatalf("Failed to load private key: %v", err)
 //	}
 //
-//	publicKey, err := selfsign.LoadCertificate("path/to/public_key.pem")
+//	cert, err := selfsign.LoadPFXCertificate("path/to/public_key.pem", "password")
 //	if err != nil {
 //	    log.Fatalf("Failed to load public key: %v", err)
 //	}
+//
+// Extract the public key from the certificate
+//
+//	 publicKey, ok := cert.PublicKey.(*rsa.PublicKey)
+//	 if !ok {
+//		 log.Fatalf("Failed to cast public key to *rsa.PublicKey")
+//	 }
 //
 // Once you have loaded the keys, you can sign and verify data:
 //
