@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"software.sslmate.com/src/go-pkcs12"
 )
@@ -80,13 +81,17 @@ func LoadPrivateKey(path, password string) (*rsa.PrivateKey, error) {
 }
 
 // Download downloads the certificate from the specified URI and stores it at the specified path.
-func Download(uri string, savePath string) error {
+func Download(uri string, saveDir string) error {
 	// Download the certificate from the URI.
 	resp, err := http.Get(uri)
 	if err != nil {
 		return fmt.Errorf("failed to download certificate: %v", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to download certificate: received status code %d", resp.StatusCode)
+	}
 
 	// Read the response body.
 	body, err := io.ReadAll(resp.Body)
@@ -100,6 +105,14 @@ func Download(uri string, savePath string) error {
 		// Successfully decoded base64, so use the decoded data.
 		body = decodedBody
 	}
+
+	// Ensure the save directory exists.
+	if err := os.MkdirAll(saveDir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %v", err)
+	}
+
+	// Construct the full file path.
+	savePath := filepath.Join(saveDir, "certs.pfx")
 
 	// Write the certificate to the save path.
 	if err := os.WriteFile(savePath, body, 0644); err != nil {
