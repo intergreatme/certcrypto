@@ -3,8 +3,12 @@ package selfsign
 import (
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"errors"
+	"fmt"
+	"io"
+	"net/http"
 	"os"
 
 	"software.sslmate.com/src/go-pkcs12"
@@ -73,4 +77,34 @@ func LoadPrivateKey(path, password string) (*rsa.PrivateKey, error) {
 
 	// Return the parsed RSA private key.
 	return privKey, nil
+}
+
+// Download downloads the certificate from the specified URI and stores it at the specified path.
+func Download(uri string, savePath string) error {
+	// Download the certificate from the URI.
+	resp, err := http.Get(uri)
+	if err != nil {
+		return fmt.Errorf("failed to download certificate: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Read the response body.
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read certificate response: %v", err)
+	}
+
+	// Check if the response body is base64 encoded.
+	decodedBody, err := base64.StdEncoding.DecodeString(string(body))
+	if err == nil {
+		// Successfully decoded base64, so use the decoded data.
+		body = decodedBody
+	}
+
+	// Write the certificate to the save path.
+	if err := os.WriteFile(savePath, body, 0644); err != nil {
+		return fmt.Errorf("failed to save certificate: %v", err)
+	}
+
+	return nil
 }
