@@ -81,7 +81,7 @@ func LoadPrivateKey(path, password string) (*rsa.PrivateKey, error) {
 }
 
 // Download downloads the certificate from the specified URI and stores it at the specified path.
-func Download(uri string, saveDir string) error {
+func Download(uri string, saveDir string, fileName string) error {
 	// Download the certificate from the URI.
 	resp, err := http.Get(uri)
 	if err != nil {
@@ -112,7 +112,8 @@ func Download(uri string, saveDir string) error {
 	}
 
 	// Construct the full file path.
-	savePath := filepath.Join(saveDir, "certs.pfx")
+	savePath := filepath.Join(saveDir, fileName)
+	fmt.Printf("Saving certificate to: %s\n", savePath) // Debug statement
 
 	// Write the certificate to the save path.
 	if err := os.WriteFile(savePath, body, 0644); err != nil {
