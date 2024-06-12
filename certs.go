@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -141,6 +142,58 @@ func Download(uri string, saveDir string, fileName string) error {
 
 	// Write the certificate to the save path.
 	if err := os.WriteFile(savePath, body, 0644); err != nil {
+		return fmt.Errorf("failed to save certificate: %v", err)
+	}
+
+	return nil
+}
+
+// DownloadAndExtractCertificate downloads the certificate, extracts it from the JSON response,
+// and saves it as a PFX file.
+func DownloadAndExtractCertificate(uri string, saveDir string, fileName string) error {
+	// Make the HTTP GET request
+	resp, err := http.Get(uri)
+	if err != nil {
+		return fmt.Errorf("could not download key: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to download certificate: received status code %d", resp.StatusCode)
+	}
+
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("could not read response body: %v", err)
+	}
+
+	// Unmarshal the JSON response to extract the certificate
+	var certResponse struct {
+		PublicKey string `json:"public_key"`
+	}
+	err = json.Unmarshal(body, &certResponse)
+	if err != nil {
+		return fmt.Errorf("could not unmarshal response: %v", err)
+	}
+
+	// Decode the base64 certificate
+	certData, err := base64.StdEncoding.DecodeString(certResponse.PublicKey)
+	if err != nil {
+		return fmt.Errorf("could not decode base64 certificate: %v", err)
+	}
+
+	// Ensure the save directory exists.
+	if err := os.MkdirAll(saveDir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %v", err)
+	}
+
+	// Construct the full file path.
+	savePath := filepath.Join(saveDir, fileName)
+	fmt.Printf("Saving certificate to: %s\n", savePath) // Debug statement
+
+	// Write the certificate to the save path.
+	if err := os.WriteFile(savePath, certData, 0644); err != nil {
 		return fmt.Errorf("failed to save certificate: %v", err)
 	}
 
