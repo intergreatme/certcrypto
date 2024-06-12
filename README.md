@@ -1,5 +1,4 @@
----
-
+```markdown
 # Sign/Verify Package
 
 This Go package provides functionalities to sign and verify data using RSA keys and x509 certificates. The package supports loading encrypted private keys and certificates from PEM files, signing data with a private key, and verifying signatures with a public key.
@@ -10,7 +9,7 @@ This Go package provides functionalities to sign and verify data using RSA keys 
 - Load certificates from PEM files.
 - Sign data using RSA private keys.
 - Verify data signatures using RSA public keys extracted from x509 certificates.
-- Download and cache public keys from a URI.
+- Download and storing of of certificates from a URI.
 
 ## Installation
 
@@ -40,7 +39,7 @@ if err != nil {
 To load a certificate from a PEM file:
 
 ```go
-certificate, err := selfsign.LoadPFXCertificate("path/to/certificate.pem")
+certificate, err := selfsign.LoadPEMCertificate("path/to/cert.pem")
 if err != nil {
     log.Fatalf("Failed to load certificate: %v", err)
 }
@@ -70,30 +69,33 @@ if err != nil {
 fmt.Println("Signature verified successfully!")
 ```
 
-### Downloading and Caching Public Keys
+### Downloading and storing of Certificates
 
-To download and cache a public key from a URI:
+To download and save a public key from a URI:
 
 ```go
 uri := "https://example.com/path/to/public/key"
-cachePath := "path/to/cache/public_key.pem"
-certificate, err := selfsign.DownloadAndCachePublicKey(uri, cachePath)
+saveDir := "path/to/save"
+fileName := "cert.pem"
+err := selfsign.DownloadAndExtractCertificate(uri, saveDir, fileName)
 if err != nil {
-    log.Fatalf("Failed to download and cache public key: %v", err)
+    log.Fatalf("Failed to download and save public key: %v", err)
 }
 ```
 
 ### Complete Example
 
-Here's a complete example demonstrating how to use the package to sign and verify data:
+Here's an example demonstrating how to use the package to sign and verify data:
 
 ```go
 package main
 
 import (
+    "crypto/rsa"
     "fmt"
     "log"
-    "selfsign"
+
+    "github.com/intergreatme/selfsign"
 )
 
 func main() {
@@ -103,7 +105,7 @@ func main() {
     myPassword := "YourPassword"
 
     // Load your certificate
-    myCert, err := selfsign.LoadCertificate(myCertPath)
+    myCert, err := selfsign.LoadPEMCertificate(myCertPath)
     if err != nil {
         log.Fatalf("Failed to load certificate: %v", err)
     }
@@ -137,9 +139,3 @@ func main() {
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Inspired by various cryptographic examples and the need for secure data signing and verification.
-
----
