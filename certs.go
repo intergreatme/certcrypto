@@ -63,6 +63,29 @@ func LoadPFXCertificateExclPass(path string) (*x509.Certificate, error) {
 	return certificate, nil
 }
 
+// LoadPEMCertificate loads a PEM encoded certificate from the specified path.
+func LoadPEMCertificate(path string) (*x509.Certificate, error) {
+	// Read the PEM file.
+	pemData, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err // Return an error if the file cannot be read.
+	}
+
+	// Decode the PEM data to extract the certificate.
+	block, _ := pem.Decode(pemData)
+	if block == nil || block.Type != "CERTIFICATE" {
+		return nil, errors.New("failed to decode PEM block containing certificate")
+	}
+
+	// Parse the X.509 certificate.
+	certificate, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, err // Return an error if the certificate cannot be parsed.
+	}
+
+	return certificate, nil
+}
+
 // LoadPrivateKey loads an encrypted private key from a PEM file.
 func LoadPrivateKey(path, password string) (*rsa.PrivateKey, error) {
 	// Read the PEM file containing the encrypted private key.
@@ -148,13 +171,13 @@ func Download(uri string, saveDir string, fileName string) error {
 	return nil
 }
 
-// DownloadAndExtractCertificate downloads the certificate, extracts it from the JSON response,
-// and saves it as a PFX file
-func DownloadAndExtractCertificate(uri string, saveDir string, fileName string) error {
-	// Make the HTTP GET request
+// DownloadAndExtractCert downloads the certificate from the specified URI,
+// extracts the public key from the JSON response, and saves it as a PEM file.
+func DownloadAndExtractCert(uri, saveDir, fileName string) error {
+	// Download the certificate from the URI.
 	resp, err := http.Get(uri)
 	if err != nil {
-		return fmt.Errorf("could not download key: %v", err)
+		return fmt.Errorf("failed to download certificate: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -162,25 +185,19 @@ func DownloadAndExtractCertificate(uri string, saveDir string, fileName string) 
 		return fmt.Errorf("failed to download certificate: received status code %d", resp.StatusCode)
 	}
 
-	// Read the response body
+	// Read the response body.
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("could not read response body: %v", err)
+		return fmt.Errorf("failed to read certificate response: %v", err)
 	}
 
-	// Unmarshal the JSON response to extract the certificate
+	// Unmarshal the JSON response to extract the certificate.
 	var certResponse struct {
 		PublicKey string `json:"public_key"`
 	}
 	err = json.Unmarshal(body, &certResponse)
 	if err != nil {
-		return fmt.Errorf("could not unmarshal response: %v", err)
-	}
-
-	// Decode the base64 certificate
-	certData, err := base64.StdEncoding.DecodeString(certResponse.PublicKey)
-	if err != nil {
-		return fmt.Errorf("could not decode base64 certificate: %v", err)
+		return fmt.Errorf("failed to unmarshal response: %v", err)
 	}
 
 	// Ensure the save directory exists.
@@ -192,8 +209,8 @@ func DownloadAndExtractCertificate(uri string, saveDir string, fileName string) 
 	savePath := filepath.Join(saveDir, fileName)
 	fmt.Printf("Saving certificate to: %s\n", savePath) // Debug statement
 
-	// Write the certificate to the save path.
-	if err := os.WriteFile(savePath, certData, 0644); err != nil {
+	// Write the public key to the save path.
+	if err := os.WriteFile(savePath, []byte(certResponse.PublicKey), 0644); err != nil {
 		return fmt.Errorf("failed to save certificate: %v", err)
 	}
 
