@@ -149,7 +149,7 @@ func Download(uri string, saveDir string, fileName string) error {
 }
 
 // DownloadAndExtractCertificate downloads the certificate, extracts it from the JSON response,
-// and saves it as a PFX file.
+// and saves it as a PFX file
 func DownloadAndExtractCertificate(uri string, saveDir string, fileName string) error {
 	// Make the HTTP GET request
 	resp, err := http.Get(uri)
