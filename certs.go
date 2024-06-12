@@ -88,34 +88,43 @@ func LoadPEMCertificate(path string) (*x509.Certificate, error) {
 
 // LoadPrivateKey loads an encrypted private key from a PEM file.
 func LoadPrivateKey(path, password string) (*rsa.PrivateKey, error) {
+	fmt.Println("Loading private key from:", path)
+
 	// Read the PEM file containing the encrypted private key.
 	pemData, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read PEM file: %v", err)
 	}
 
 	// Decode the PEM data to extract the PEM block.
 	block, _ := pem.Decode(pemData)
-	if block == nil || block.Type != "ENCRYPTED PRIVATE KEY" {
+	if block == nil {
 		return nil, errors.New("failed to decode PEM block containing private key")
+	}
+
+	fmt.Println("PEM block type:", block.Type)
+
+	if block.Type != "ENCRYPTED PRIVATE KEY" {
+		return nil, fmt.Errorf("unexpected PEM block type: %s", block.Type)
 	}
 
 	// Decrypt the private key using the provided password.
 	privBytes, err := decryptPrivateKey(block.Bytes, password)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decrypt private key: %v", err)
 	}
 
 	// Try to parse the decrypted private key as PKCS1.
 	privKey, err := x509.ParsePKCS1PrivateKey(privBytes)
 	if err == nil {
+		fmt.Println("Successfully parsed PKCS1 private key")
 		return privKey, nil
 	}
 
 	// If parsing as PKCS1 fails, try to parse it as PKCS8.
 	privKeyInterface, err := x509.ParsePKCS8PrivateKey(privBytes)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse PKCS8 private key: %v", err)
 	}
 
 	// Assert the parsed key is of type *rsa.PrivateKey.
@@ -125,6 +134,7 @@ func LoadPrivateKey(path, password string) (*rsa.PrivateKey, error) {
 	}
 
 	// Return the parsed RSA private key.
+	fmt.Println("Successfully loaded and parsed private key")
 	return privKey, nil
 }
 
