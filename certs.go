@@ -15,7 +15,7 @@ import (
 	"software.sslmate.com/src/go-pkcs12"
 )
 
-// LoadPFXCertificate loads a certificate from a PFX file.
+// LoadPFXCertificate loads a certificate from a PFX file encrypted with password.
 func LoadPFXCertificate(path, password string) (*x509.Certificate, error) {
 	// Read the PFX file containing the certificate.
 	pfxData, err := os.ReadFile(path)
@@ -25,6 +25,30 @@ func LoadPFXCertificate(path, password string) (*x509.Certificate, error) {
 
 	// Decode the PFX data to extract the certificate.
 	privateKey, certificate, err := pkcs12.Decode(pfxData, password)
+	if err != nil {
+		return nil, err // Return an error if the PFX data cannot be decoded.
+	}
+
+	// Assert the private key type and discard it if present.
+	if _, ok := privateKey.(*rsa.PrivateKey); !ok {
+		return nil, errors.New("unexpected private key type in PFX file")
+	}
+
+	// Return the parsed x509 certificate.
+	return certificate, nil
+}
+
+// LoadPFXCertificate loads a PFX certificate without requiring a password.
+// Specific use for IGM's Certificate that's returned.
+func LoadPFXCertificateExclPass(path string) (*x509.Certificate, error) {
+	// Read the PFX file containing the certificate.
+	pfxData, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err // Return an error if the file cannot be read.
+	}
+
+	// Decode the PFX data to extract the certificate.
+	privateKey, certificate, err := pkcs12.Decode(pfxData, "")
 	if err != nil {
 		return nil, err // Return an error if the PFX data cannot be decoded.
 	}
