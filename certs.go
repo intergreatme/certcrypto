@@ -3,7 +3,6 @@ package selfsign
 import (
 	"crypto/rsa"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -11,217 +10,106 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"software.sslmate.com/src/go-pkcs12"
 )
 
-// LoadPFXCertificate loads a certificate from a PFX file encrypted with password.
-func LoadPFXCertificate(path, password string) (*x509.Certificate, error) {
-	// Read the PFX file containing the certificate.
-	pfxData, err := os.ReadFile(path)
+// ReadPKCS12 reads a .pfx file and extracts them RSA private key and certificate
+func ReadPKCS12(filepath string, password string) (*rsa.PrivateKey, *x509.Certificate, error) {
+	// Read the .pfx file
+	pfxData, err := os.ReadFile(filepath)
 	if err != nil {
-		return nil, err // Return an error if the file cannot be read.
+		return nil, nil, fmt.Errorf("unable to read .pfx file: %v", err)
 	}
 
-	// Decode the PFX data to extract the certificate.
-	privateKey, certificate, err := pkcs12.Decode(pfxData, password)
+	// Decode the PKCS#12 file
+	privateKey, cert, err := pkcs12.Decode(pfxData, password)
 	if err != nil {
-		return nil, err // Return an error if the PFX data cannot be decoded.
+		return nil, nil, fmt.Errorf("unable to decode .pfx file: %v", err)
 	}
 
-	// Assert the private key type and discard it if present.
-	if _, ok := privateKey.(*rsa.PrivateKey); !ok {
-		return nil, errors.New("unexpected private key type in PFX file")
-	}
-
-	// Return the parsed x509 certificate.
-	return certificate, nil
-}
-
-// LoadPFXCertificate loads a PFX certificate without requiring a password.
-// Specific use for IGM's Certificate that's returned.
-func LoadPFXCertificateExclPass(path string) (*x509.Certificate, error) {
-	// Read the PFX file containing the certificate.
-	pfxData, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err // Return an error if the file cannot be read.
-	}
-
-	// Decode the PFX data to extract the certificate.
-	privateKey, certificate, err := pkcs12.Decode(pfxData, "")
-	if err != nil {
-		return nil, err // Return an error if the PFX data cannot be decoded.
-	}
-
-	// Assert the private key type and discard it if present.
-	if _, ok := privateKey.(*rsa.PrivateKey); !ok {
-		return nil, errors.New("unexpected private key type in PFX file")
-	}
-
-	// Return the parsed x509 certificate.
-	return certificate, nil
-}
-
-// LoadPEMCertificate loads a PEM encoded certificate from the specified path.
-func LoadPEMCertificate(path string) (*x509.Certificate, error) {
-	// Read the PEM file.
-	pemData, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err // Return an error if the file cannot be read.
-	}
-
-	// Decode the PEM data to extract the certificate.
-	block, _ := pem.Decode(pemData)
-	if block == nil || block.Type != "CERTIFICATE" {
-		return nil, errors.New("failed to decode PEM block containing certificate")
-	}
-
-	// Parse the X.509 certificate.
-	certificate, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil, err // Return an error if the certificate cannot be parsed.
-	}
-
-	return certificate, nil
-}
-
-// LoadPrivateKey loads an encrypted private key from a PEM file.
-func LoadPrivateKey(path, password string) (*rsa.PrivateKey, error) {
-	fmt.Println("Loading private key from:", path)
-
-	// Read the PEM file containing the encrypted private key.
-	pemData, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read PEM file: %v", err)
-	}
-
-	// Decode the PEM data to extract the PEM block.
-	block, _ := pem.Decode(pemData)
-	if block == nil {
-		return nil, errors.New("failed to decode PEM block containing private key")
-	}
-
-	fmt.Println("PEM block type:", block.Type)
-
-	if block.Type != "ENCRYPTED PRIVATE KEY" {
-		return nil, fmt.Errorf("unexpected PEM block type: %s", block.Type)
-	}
-
-	// Decrypt the private key using the provided password.
-	privBytes, err := decryptPrivateKey(block.Bytes, password)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt private key: %v", err)
-	}
-
-	// Try to parse the decrypted private key as PKCS1.
-	privKey, err := x509.ParsePKCS1PrivateKey(privBytes)
-	if err == nil {
-		fmt.Println("Successfully parsed PKCS1 private key")
-		return privKey, nil
-	}
-
-	// If parsing as PKCS1 fails, try to parse it as PKCS8.
-	privKeyInterface, err := x509.ParsePKCS8PrivateKey(privBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse PKCS8 private key: %v", err)
-	}
-
-	// Assert the parsed key is of type *rsa.PrivateKey.
-	privKey, ok := privKeyInterface.(*rsa.PrivateKey)
+	// Type assert the private key to an *rsa.PrivateKey
+	rsaPrivateKey, ok := privateKey.(*rsa.PrivateKey)
 	if !ok {
-		return nil, errors.New("failed to cast private key to *rsa.PrivateKey")
+		return nil, nil, errors.New("private key is not of type *rsa.PrivateKey")
 	}
 
-	// Return the parsed RSA private key.
-	fmt.Println("Successfully loaded and parsed private key")
-	return privKey, nil
+	return rsaPrivateKey, cert, nil
 }
 
-// Download downloads the certificate from the specified URI and stores it at the specified path.
-func Download(uri string, saveDir string, fileName string) error {
-	// Download the certificate from the URI.
-	resp, err := http.Get(uri)
+// WriteCertificateToPEM writes an x509 certificate to a PEM-encoded file
+func WriteCertificateToPEM(cert *x509.Certificate, filepath string) error {
+	// Create a PEM block with the certificate
+	certPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: cert.Raw,
+	})
+
+	// Write the PEM block to the specified file
+	err := os.WriteFile(filepath, certPEM, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to download certificate: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download certificate: received status code %d", resp.StatusCode)
-	}
-
-	// Read the response body.
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read certificate response: %v", err)
-	}
-
-	// Check if the response body is base64 encoded.
-	decodedBody, err := base64.StdEncoding.DecodeString(string(body))
-	if err == nil {
-		// Successfully decoded base64, so use the decoded data.
-		body = decodedBody
-	}
-
-	// Ensure the save directory exists.
-	if err := os.MkdirAll(saveDir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory: %v", err)
-	}
-
-	// Construct the full file path.
-	savePath := filepath.Join(saveDir, fileName)
-	fmt.Printf("Saving certificate to: %s\n", savePath) // Debug statement
-
-	// Write the certificate to the save path.
-	if err := os.WriteFile(savePath, body, 0644); err != nil {
-		return fmt.Errorf("failed to save certificate: %v", err)
+		return fmt.Errorf("unable to write certificate to file: %v", err)
 	}
 
 	return nil
 }
 
-// DownloadAndExtractCert downloads the certificate from the specified URI,
-// extracts the public key from the JSON response, and saves it as a PEM file.
-func DownloadAndExtractCert(uri, saveDir, fileName string) error {
-	// Download the certificate from the URI.
+// ReadCertFromPEM reads an x509 certificate from a PEM-encoded file
+func ReadCertFromPEM(filepath string) (*x509.Certificate, error) {
+	// Read the PEM file
+	pemData, err := os.ReadFile(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read PEM file: %v", err)
+	}
+
+	// Decode the PEM block
+	block, _ := pem.Decode(pemData)
+	if block == nil || block.Type != "CERTIFICATE" {
+		return nil, fmt.Errorf("failed to decode PEM block containing certificate")
+	}
+
+	// Parse the x509 certificate
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse certificate: %v", err)
+	}
+
+	return cert, nil
+}
+
+// DownloadCert downloads a certificate from a given URI and writes it to a PEM file
+func DownloadCert(uri string, filepath string) error {
+	// Perform HTTP GET request
 	resp, err := http.Get(uri)
 	if err != nil {
-		return fmt.Errorf("failed to download certificate: %v", err)
+		return fmt.Errorf("unable to perform GET request: %v", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download certificate: received status code %d", resp.StatusCode)
-	}
-
-	// Read the response body.
+	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read certificate response: %v", err)
+		return fmt.Errorf("unable to read response body: %v", err)
 	}
 
-	// Unmarshal the JSON response to extract the certificate.
-	var certResponse struct {
-		PublicKey string `json:"public_key"`
+	var pemData []byte
+
+	// Check if the response is JSON-encoded
+	if resp.Header.Get("Content-Type") == "application/json" {
+		var result map[string]string
+		err := json.Unmarshal(body, &result)
+		if err != nil {
+			return fmt.Errorf("unable to unmarshal JSON response: %v", err)
+		}
+		pemData = []byte(result["public_key"])
+	} else {
+		pemData = body
 	}
-	err = json.Unmarshal(body, &certResponse)
+
+	// Write the PEM data to a file
+	err = os.WriteFile(filepath, pemData, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal response: %v", err)
-	}
-
-	// Ensure the save directory exists.
-	if err := os.MkdirAll(saveDir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory: %v", err)
-	}
-
-	// Construct the full file path.
-	savePath := filepath.Join(saveDir, fileName)
-	fmt.Printf("Saving certificate to: %s\n", savePath) // Debug statement
-
-	// Write the public key to the save path.
-	if err := os.WriteFile(savePath, []byte(certResponse.PublicKey), 0644); err != nil {
-		return fmt.Errorf("failed to save certificate: %v", err)
+		return fmt.Errorf("unable to write PEM file: %v", err)
 	}
 
 	return nil

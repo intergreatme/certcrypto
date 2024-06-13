@@ -1,4 +1,4 @@
-module github.com/intergreatme/selfsign
+module github.com/intergreatme/certcrypto
 
 go 1.22.3
 
