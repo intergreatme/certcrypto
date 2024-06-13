@@ -1,47 +1,57 @@
-```markdown
-# Sign/Verify Package
+# CertCrypto Package
 
-This Go package provides functionalities to sign and verify data using RSA keys and x509 certificates. The package supports loading encrypted private keys and certificates from PEM files, signing data with a private key, and verifying signatures with a public key.
+This Go package provides functionalities to manage certificates and keys, sign and verify data using RSA keys and x509 certificates. The package supports reading and saving certificates from PEM and PKCS#12 files, signing data with a private key, and verifying signatures with a public key.
 
 ## Features
 
-- Load encrypted private keys from PEM files.
+- Load RSA private keys and certificates from PKCS#12 (.pfx) files.
 - Load certificates from PEM files.
 - Sign data using RSA private keys.
 - Verify data signatures using RSA public keys extracted from x509 certificates.
-- Download and storing of of certificates from a URI.
+- Download and store certificates from a URI in PEM format.
 
 ## Installation
 
 To install the package, use `go get`:
 
 ```sh
-go get github.com/intergreatme/selfsign
+go get github.com/intergreatme/certcrypto
 ```
 
 ## Usage
 
-### Loading Keys and Certificates
+### Reading Keys and Certificates
 
-#### Load a Private Key
+#### Read a Certificate and Private Key from a PKCS#12 File
 
-To load an encrypted private key from a PEM file:
+To load a certificate and private key from a PKCS#12 (.pfx) file:
 
 ```go
-privateKey, err := selfsign.LoadPrivateKey("path/to/private_key.pem", "password")
+certificate, privateKey, err := certcrypto.ReadPKCS12("path/to/certificate.pfx", "password")
 if err != nil {
-    log.Fatalf("Failed to load private key: %v", err)
+    log.Fatalf("Failed to load certificate and private key: %v", err)
 }
 ```
 
-#### Load a Certificate
+#### Read a Certificate from a PEM File
 
 To load a certificate from a PEM file:
 
 ```go
-certificate, err := selfsign.LoadPEMCertificate("path/to/cert.pem")
+certificate, err := certcrypto.ReadCertFromPEM("path/to/cert.pem")
 if err != nil {
     log.Fatalf("Failed to load certificate: %v", err)
+}
+```
+
+#### Save a Certificate to a PEM File
+
+To save a certificate to a PEM file:
+
+```go
+err := certcrypto.WriteCertificateToPEM(certificate, "path/to/output/cert.pem")
+if err != nil {
+    log.Fatalf("Failed to write certificate to PEM file: %v", err)
 }
 ```
 
@@ -51,7 +61,7 @@ To sign data using a private key:
 
 ```go
 data := []byte("data to be signed")
-signature, err := selfsign.SignData(privateKey, data)
+signature, err := certcrypto.SignData(privateKey, data)
 if err != nil {
     log.Fatalf("Failed to sign data: %v", err)
 }
@@ -62,30 +72,30 @@ if err != nil {
 To verify the signature of data using a public key extracted from a certificate:
 
 ```go
-err := selfsign.VerifySignature(certificate.PublicKey.(*rsa.PublicKey), data, signature)
+err := certcrypto.VerifySignature(certificate.PublicKey.(*rsa.PublicKey), data, signature)
 if err != nil {
     log.Fatalf("Failed to verify signature: %v", err)
 }
 fmt.Println("Signature verified successfully!")
 ```
 
-### Downloading and storing of Certificates
+### Downloading and Storing Certificates
 
-To download and save a public key from a URI:
+To download and save a certificate that contains both the certificate and the public key in .pem format:
 
 ```go
 uri := "https://example.com/path/to/public/key"
-saveDir := "path/to/save"
-fileName := "cert.pem"
-err := selfsign.DownloadAndExtractCertificate(uri, saveDir, fileName)
+filepath := "path/to/save/cert.pem"
+err := certcrypto.DownloadCert(uri, filepath)
 if err != nil {
     log.Fatalf("Failed to download and save public key: %v", err)
 }
+
 ```
 
 ### Complete Example
 
-Here's an example demonstrating how to use the package to sign and verify data:
+To download and save a certificate, which includes the public key, in .pem format:
 
 ```go
 package main
@@ -95,38 +105,31 @@ import (
     "fmt"
     "log"
 
-    "github.com/intergreatme/selfsign"
+    "github.com/intergreatme/certcrypto"
 )
 
 func main() {
-    // Paths to your certificate and private key files
-    myCertPath := "my_cert.pem"
-    myKeyPath := "my_key.pem"
-    myPassword := "YourPassword"
+    // Path to your certificate and private key files
+    pfxPath := "path/to/certificate.pfx"
+    password := "YourPassword"
 
-    // Load your certificate
-    myCert, err := selfsign.LoadPEMCertificate(myCertPath)
+    // Load your certificate and private key
+    cert, privateKey, err := certcrypto.ReadPKCS12(pfxPath, password)
     if err != nil {
-        log.Fatalf("Failed to load certificate: %v", err)
-    }
-
-    // Load your private key
-    myPrivateKey, err := selfsign.LoadPrivateKey(myKeyPath, myPassword)
-    if err != nil {
-        log.Fatalf("Failed to load private key: %v", err)
+        log.Fatalf("Failed to load certificate and private key: %v", err)
     }
 
     // Data to be signed
     data := []byte("hello, world")
 
     // Sign the data
-    signature, err := selfsign.SignData(myPrivateKey, data)
+    signature, err := certcrypto.SignData(privateKey, data)
     if err != nil {
         log.Fatalf("Failed to sign data: %v", err)
     }
 
     // Verify the signed data using your own public key
-    err = selfsign.VerifySignature(myCert.PublicKey.(*rsa.PublicKey), data, signature)
+    err = certcrypto.VerifySignature(cert.PublicKey.(*rsa.PublicKey), data, signature)
     if err != nil {
         log.Fatalf("Failed to verify data: %v", err)
     }

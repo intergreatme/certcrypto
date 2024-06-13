@@ -1,4 +1,4 @@
-package selfsign
+package certcrypto
 
 import (
 	"crypto/rsa"
